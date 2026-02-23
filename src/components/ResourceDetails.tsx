@@ -77,6 +77,57 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
           <div className="space-y-6">
             <div>
               <h4 className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 mb-3">
+                Overview
+              </h4>
+              <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm space-y-2">
+                {details.type && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Type</span>
+                    <span className="font-medium font-mono text-gray-900 dark:text-gray-100 text-xs">{details.type}</span>
+                  </div>
+                )}
+                {details.name && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Name</span>
+                    <span className="font-medium font-mono text-gray-900 dark:text-gray-100 text-xs">{details.name}</span>
+                  </div>
+                )}
+                {details.provider_name && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Provider</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 text-xs">{details.provider_name}</span>
+                  </div>
+                )}
+                {(details.change?.after?.arn || details.change?.before?.arn) && (
+                  <div className="flex justify-between items-start group/arn pt-1 pb-1">
+                    <span className="text-gray-500 dark:text-gray-400 mt-0.5 mr-2 flex-shrink-0">ARN</span>
+                    <div className="flex items-start justify-end flex-wrap gap-1 text-right">
+                      <span className="font-medium font-mono text-gray-900 dark:text-gray-100 text-[10px] break-all mt-0.5">
+                        {details.change?.after?.arn || details.change?.before?.arn}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(details.change?.after?.arn || details.change?.before?.arn)}
+                        className="p-1 -mr-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 opacity-0 group-hover/arn:opacity-100 transition-all flex-shrink-0"
+                        title="Copy ARN"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {details.change?.actions && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Plan Action</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 uppercase text-[10px] px-2 py-0.5 bg-gray-200 dark:bg-gray-800 rounded">
+                      {details.change.actions.join(', ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs uppercase tracking-wider font-bold text-gray-500 dark:text-gray-400 mb-3">
                 Commands
               </h4>
               <div className="grid grid-cols-1 gap-3">

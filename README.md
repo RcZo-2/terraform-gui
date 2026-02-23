@@ -8,7 +8,7 @@ A Next.js web application for visualizing Terraform plan JSON files.
 - **Interactive Diagram:** See your infrastructure graphically. Resources and their relationships are visualized as an interactive node diagram built with [React Flow](https://reactflow.dev/).
 - **Resource Details:** Click on any node in the diagram to view its details.
 - **Resizable Side Pane:** The details pane appears on the left and can be dynamically resized using a drag handle.
-- **Quick Commands & JSON:** The details view provides copy-pasteable `terraform apply` and `destroy` target commands, along with a viewer for the raw JSON details.
+- **Quick Commands & JSON:** The details view provides copy-pasteable `terraform apply` and `destroy` target commands, an extracted overview of essential resource fields (Type, Name, Provider, Action, ARN), and a complete viewer for the raw JSON details.
 
 ## Tech Stack
 
