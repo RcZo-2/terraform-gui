@@ -50,7 +50,7 @@ export const parsePlan = (plan: TerraformPlan): { nodes: Node[], edges: Edge[] }
 
     nodes.push({
       id,
-      position: { x: 0, y: 0 }, // Initial position, will be calculated by Dagre
+      position: { x: 0, y: 0 }, // Initial position, will be calculated by ELK
       data: {
         label: resource.name,
         resourceName: resource.name,

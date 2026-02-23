@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -10,12 +10,13 @@ import ReactFlow, {
   Background,
   MiniMap,
   ReactFlowProvider,
-  Position,
   NodeMouseHandler,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import dagre from 'dagre';
 import CustomNode from './CustomNode';
+import { getElkLayout } from '@/lib/layout/elkLayout';
+import SearchBar from './SearchBar';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -27,63 +28,67 @@ interface DiagramProps {
   onNodeClick: (node: Node) => void;
 }
 
-const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-  dagreGraph.setGraph({ rankdir: 'TB' });
-
-  nodes.forEach((node) => {
-    // dagre needs width and height to layout correctly.
-    // We are guessing the size of our custom node.
-    dagreGraph.setNode(node.id, { width: 250, height: 80 });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  dagre.layout(dagreGraph);
-
-  const layoutedNodes = nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
-    const newNode = {
-      ...node,
-      targetPosition: Position.Top,
-      sourcePosition: Position.Bottom,
-      position: {
-        x: nodeWithPosition.x - 125,
-        y: nodeWithPosition.y - 40,
-      },
-    };
-    return newNode;
-  });
-
-  return { nodes: layoutedNodes, edges };
-};
-
 const LayoutFlow = ({ initialNodes, initialEdges, onNodeClick }: DiagramProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isLayouting, setIsLayouting] = useState(true);
+  const { fitView } = useReactFlow();
 
   useEffect(() => {
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      initialNodes,
-      initialEdges
-    );
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+    const runLayout = async () => {
+      setIsLayouting(true);
+      const { nodes: layoutedNodes, edges: layoutedEdges } = await getElkLayout(
+        initialNodes,
+        initialEdges
+      );
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      setIsLayouting(false);
+
+      // Fit view after layout
+      setTimeout(() => {
+        fitView({ duration: 500 });
+      }, 50);
+    };
+
+    runLayout();
+  }, [initialNodes, initialEdges, setNodes, setEdges, fitView]);
 
   const onNodeClickCallback: NodeMouseHandler = useCallback(
     (_, node) => {
+      if (node.type === 'group') return;
       onNodeClick(node);
     },
     [onNodeClick]
   );
 
+  const handleSearchSelect = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (node) {
+      fitView({ nodes: [node], duration: 800, padding: 0.5 });
+      onNodeClick(node);
+    }
+  }, [nodes, fitView, onNodeClick]);
+
+  const searchableNodes = useMemo(() =>
+    nodes
+      .filter((n) => n.type === 'custom')
+      .map((n) => ({
+        id: n.id,
+        label: n.data.label || n.id,
+        type: n.data.resourceType || '',
+      })),
+    [nodes]
+  );
+
   return (
-    <div className="w-full h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-gray-50 shadow-inner">
+    <div className="relative w-full h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-gray-50 shadow-inner group">
+      {/* Search Bar Container */}
+      <div className="absolute top-4 left-4 z-40 w-full max-w-sm pointer-events-none">
+         {/* Pass pointer events to search bar */}
+         <SearchBar nodes={searchableNodes} onSelect={handleSearchSelect} />
+      </div>
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -93,11 +98,18 @@ const LayoutFlow = ({ initialNodes, initialEdges, onNodeClick }: DiagramProps) =
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-right"
+        className={isLayouting ? 'opacity-0' : 'opacity-100 transition-opacity duration-500'}
       >
         <Controls />
         <MiniMap />
         <Background gap={16} size={1} />
       </ReactFlow>
+
+      {isLayouting && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50/80 z-50">
+           <div className="animate-pulse text-blue-500 font-semibold">Calculating Layout...</div>
+        </div>
+      )}
     </div>
   );
 };
