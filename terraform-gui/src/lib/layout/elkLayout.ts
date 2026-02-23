@@ -6,8 +6,8 @@ const elk = new ELK();
 
 const elkOptions = {
   'elk.algorithm': 'layered',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-  'elk.spacing.nodeNode': '80',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '120',
+  'elk.spacing.nodeNode': '100',
   'elk.direction': 'DOWN',
   'elk.padding': '[top=50,left=50,bottom=50,right=50]',
   'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
@@ -17,21 +17,40 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
   const elkNodes: any[] = [];
   const elkEdges: any[] = [];
 
+  // Store groups
   const groups: Record<string, any> = {};
 
   nodes.forEach((node) => {
-    const groupKey = node.data.resourceType || 'unknown';
+    // New Strategy: Group by Module or Parent Address component
+    // Example address: "module.vpc.aws_subnet.private[0]" -> Group: "module.vpc"
+    // Example address: "aws_s3_bucket.main" -> Group: "root" or "aws_s3_bucket"
+
+    let groupKey = 'root';
+    const parts = node.data.address.split('.');
+
+    if (parts.length > 2) {
+      const moduleIndex = parts.indexOf('module');
+      if (moduleIndex !== -1 && parts.length > moduleIndex + 2) {
+         // group by module name e.g., module.vpc
+         groupKey = parts.slice(0, moduleIndex + 2).join('.');
+      } else {
+         // Fallback to resource type grouping if not in a module
+         groupKey = node.data.resourceType;
+      }
+    } else {
+       groupKey = node.data.resourceType;
+    }
 
     if (!groups[groupKey]) {
       const groupNode = {
         id: `group-${groupKey}`,
-        labels: [{ text: groupKey }],
+        labels: [{ text: groupKey }], // Label for ELK
         children: [],
         layoutOptions: {
           'elk.padding': '[top=40,left=20,bottom=20,right=20]',
-          'elk.spacing.nodeNode': '20',
-          'elk.algorithm': 'layered',
-          'elk.direction': 'RIGHT',
+          'elk.spacing.nodeNode': '30',
+          'elk.algorithm': 'rectpacking', // Tighter packing inside groups
+          'elk.aspectRatio': '2.5', // Try to keep groups slightly wider
         },
         properties: { type: 'group' },
       };
@@ -39,6 +58,7 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
       elkNodes.push(groupNode);
     }
 
+    // Add child node to group
     groups[groupKey].children.push({
       id: node.id,
       width: 250,
@@ -71,8 +91,10 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
   try {
     const layoutedGraph = await elk.layout(graph);
 
+    // Convert back to React Flow nodes
     const newNodes: Node[] = [];
 
+    // 1. Add Groups
     (layoutedGraph.children || []).forEach((group: any) => {
       newNodes.push({
         id: group.id,
@@ -92,11 +114,13 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
         zIndex: -1,
       });
 
+      // 2. Add Children
       (group.children || []).forEach((child: any) => {
         const originalData = child.properties?.originalData || {};
 
         newNodes.push({
           id: child.id,
+          // Relative position to parent
           position: { x: child.x, y: child.y },
           data: originalData,
           type: 'custom',
@@ -107,7 +131,14 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
       });
     });
 
-    return { nodes: newNodes, edges };
+    const newEdges = edges.map(edge => ({
+      ...edge,
+      type: 'smoothstep',
+      animated: true,
+      style: { stroke: '#b1b1b7', strokeWidth: 2 },
+    }));
+
+    return { nodes: newNodes, edges: newEdges };
   } catch (error) {
     console.error('ELK Layout Failed:', error);
     return { nodes, edges };
