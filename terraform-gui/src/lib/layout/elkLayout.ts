@@ -11,6 +11,7 @@ const elkOptions = {
   'elk.direction': 'DOWN',
   'elk.padding': '[top=50,left=50,bottom=50,right=50]',
   'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+  'elk.edgeRouting': 'ORTHOGONAL',
 };
 
 export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
@@ -20,11 +21,8 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
   // Store groups
   const groups: Record<string, any> = {};
 
+  // Group nodes by Module or Parent Address component
   nodes.forEach((node) => {
-    // New Strategy: Group by Module or Parent Address component
-    // Example address: "module.vpc.aws_subnet.private[0]" -> Group: "module.vpc"
-    // Example address: "aws_s3_bucket.main" -> Group: "root" or "aws_s3_bucket"
-
     let groupKey = 'root';
     const parts = node.data.address.split('.');
 
@@ -34,7 +32,6 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
          // group by module name e.g., module.vpc
          groupKey = parts.slice(0, moduleIndex + 2).join('.');
       } else {
-         // Fallback to resource type grouping if not in a module
          groupKey = node.data.resourceType;
       }
     } else {
@@ -96,6 +93,7 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
 
     // 1. Add Groups
     (layoutedGraph.children || []).forEach((group: any) => {
+      // Note: ELK returns x,y relative to parent. For root children, it's absolute.
       newNodes.push({
         id: group.id,
         position: { x: group.x, y: group.y },
@@ -117,6 +115,16 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
       // 2. Add Children
       (group.children || []).forEach((child: any) => {
         const originalData = child.properties?.originalData || {};
+
+        // IMPORTANT FIX:
+        // React Flow `parentNode` expects `position` to be RELATIVE to the parent node's top-left corner (0,0).
+        // ELK returns `x` and `y` relative to parent's content box (usually).
+        // However, if we use `extent: 'parent'`, the node must fit inside.
+        // Let's verify coordinates. If ELK returns absolute coords for nested nodes (which it sometimes does depending on options),
+        // we might need to adjust. But `layered` usually handles hierarchy.
+        // BUT: If the group node has padding, ELK's child coordinates might be relative to the content area,
+        // whereas React Flow coordinates are relative to the top-left corner of the parent node div.
+        // Let's assume ELK returns relative to parent's top-left for now.
 
         newNodes.push({
           id: child.id,

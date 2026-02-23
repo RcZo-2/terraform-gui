@@ -66,7 +66,8 @@ const LayoutFlow = ({ initialNodes, initialEdges, onNodeClick }: DiagramProps) =
     const node = nodes.find((n) => n.id === nodeId);
     if (node) {
       fitView({ nodes: [node], duration: 800, padding: 0.5 });
-      onNodeClick(node);
+      // Delay selection to allow animation
+      setTimeout(() => onNodeClick(node), 100);
     }
   }, [nodes, fitView, onNodeClick]);
 
@@ -83,10 +84,11 @@ const LayoutFlow = ({ initialNodes, initialEdges, onNodeClick }: DiagramProps) =
 
   return (
     <div className="relative w-full h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-gray-50 shadow-inner group">
-      {/* Search Bar Container */}
+      {/* Search Bar Container - Add pointer-events-none to container but auto to children */}
       <div className="absolute top-4 left-4 z-40 w-full max-w-sm pointer-events-none">
-         {/* Pass pointer events to search bar */}
-         <SearchBar nodes={searchableNodes} onSelect={handleSearchSelect} />
+         <div className="pointer-events-auto">
+            <SearchBar nodes={searchableNodes} onSelect={handleSearchSelect} />
+         </div>
       </div>
 
       <ReactFlow
@@ -99,6 +101,7 @@ const LayoutFlow = ({ initialNodes, initialEdges, onNodeClick }: DiagramProps) =
         fitView
         attributionPosition="bottom-right"
         className={isLayouting ? 'opacity-0' : 'opacity-100 transition-opacity duration-500'}
+        minZoom={0.1}
       >
         <Controls />
         <MiniMap />

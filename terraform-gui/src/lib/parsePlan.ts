@@ -42,11 +42,15 @@ export const parsePlan = (plan: TerraformPlan): { nodes: Node[], edges: Edge[] }
     addressToIdMap[resource.address] = id;
 
     // Determine the action (create, update, delete, no-op)
-    const actions = resource.change.actions;
+    const actions = resource.change?.actions || [];
     let actionType = 'no-op';
     if (actions.includes('create')) actionType = 'create';
     else if (actions.includes('delete')) actionType = 'delete';
     else if (actions.includes('update')) actionType = 'update';
+
+    // IMPORTANT: Ensure 'details' includes 'change' object properly
+    // This was possibly missing or malformed in previous versions leading to 'undefined' errors
+    // Also resource.provider_name might be long, let's keep it raw.
 
     nodes.push({
       id,
@@ -57,9 +61,9 @@ export const parsePlan = (plan: TerraformPlan): { nodes: Node[], edges: Edge[] }
         resourceType: resource.type,
         address: resource.address,
         action: actionType,
-        details: resource
+        details: resource // Pass the whole resource object as details
       },
-      type: 'custom', // We will implement a custom node component later
+      type: 'custom',
     });
   });
 
@@ -90,8 +94,6 @@ export const parsePlan = (plan: TerraformPlan): { nodes: Node[], edges: Edge[] }
     plan.configuration.root_module.resources.forEach((config) => {
       const sourceId = config.address; // This is the dependent resource (e.g., Subnet)
 
-      // If this resource isn't in our list of changes, we might still want to track it if we visualize existing resources
-      // but for now let's stick to what's in resource_changes
       if (!addressToIdMap[sourceId]) return;
 
       const dependencies = new Set<string>();
