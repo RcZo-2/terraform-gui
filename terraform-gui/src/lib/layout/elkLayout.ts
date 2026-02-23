@@ -88,15 +88,24 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
   try {
     const layoutedGraph = await elk.layout(graph);
 
-    // Convert back to React Flow nodes
+    // Convert back to React Flow nodes with ABSOLUTE positions (flattened)
     const newNodes: Node[] = [];
 
-    // 1. Add Groups
+    // Helper to calculate absolute position
+    const getAbsolutePos = (node: any, parentX = 0, parentY = 0) => {
+      const x = parentX + (node.x || 0);
+      const y = parentY + (node.y || 0);
+      return { x, y };
+    };
+
+    // 1. Add Groups (as background nodes)
     (layoutedGraph.children || []).forEach((group: any) => {
-      // Note: ELK returns x,y relative to parent. For root children, it's absolute.
+      // For root children, position is absolute (relative to root)
+      const groupPos = getAbsolutePos(group);
+
       newNodes.push({
         id: group.id,
-        position: { x: group.x, y: group.y },
+        position: { x: groupPos.x, y: groupPos.y },
         data: { label: group.labels?.[0]?.text },
         style: {
           width: group.width,
@@ -110,31 +119,24 @@ export const getElkLayout = async (nodes: Node[], edges: Edge[]) => {
         },
         type: 'group',
         zIndex: -1,
+        // DO NOT set parentNode or expandParent: flatten structure
       });
 
-      // 2. Add Children
+      // 2. Add Children (as independent nodes with absolute positions)
       (group.children || []).forEach((child: any) => {
         const originalData = child.properties?.originalData || {};
 
-        // IMPORTANT FIX:
-        // React Flow `parentNode` expects `position` to be RELATIVE to the parent node's top-left corner (0,0).
-        // ELK returns `x` and `y` relative to parent's content box (usually).
-        // However, if we use `extent: 'parent'`, the node must fit inside.
-        // Let's verify coordinates. If ELK returns absolute coords for nested nodes (which it sometimes does depending on options),
-        // we might need to adjust. But `layered` usually handles hierarchy.
-        // BUT: If the group node has padding, ELK's child coordinates might be relative to the content area,
-        // whereas React Flow coordinates are relative to the top-left corner of the parent node div.
-        // Let's assume ELK returns relative to parent's top-left for now.
+        // Calculate absolute position based on parent group
+        const childPos = getAbsolutePos(child, groupPos.x, groupPos.y);
 
         newNodes.push({
           id: child.id,
-          // Relative position to parent
-          position: { x: child.x, y: child.y },
+          // Use absolute position
+          position: { x: childPos.x, y: childPos.y },
           data: originalData,
           type: 'custom',
-          parentNode: group.id,
-          extent: 'parent',
-          expandParent: true,
+          // DO NOT set parentNode: flatten structure
+          zIndex: 1, // Ensure children are above groups
         });
       });
     });

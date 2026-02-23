@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Node } from 'reactflow';
-import { Copy, X, Terminal, GripVertical, Layers, ArrowRight, Tag } from 'lucide-react';
+import { Copy, X, Terminal, GripVertical, Layers, ArrowRight, Tag, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ResourceDetailsProps {
@@ -59,7 +59,7 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
   const applyCommand = `terraform apply -target='${address}'`;
   const destroyCommand = `terraform destroy -target='${address}'`;
 
-  // Safe access to nested properties
+  // Safe access to nested properties with fallbacks
   const change = details?.change || {};
   const before = change.before;
   const after = change.after || {};
@@ -79,12 +79,11 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
     }
   };
 
-  // Get keys to display in diff
-  // Use 'after' object if present (create/update), else 'before' (delete).
-  // If update, we ideally compare both, but showing 'after' state is primary.
   const displayObj = after || before || {};
-  // Exclude some internal keys or large objects from simple list
   const displayKeys = Object.keys(displayObj).filter(k => k !== 'tags' && k !== 'id' && k !== 'arn');
+
+  // Handle case where details might be missing
+  const hasDetails = details && typeof details === 'object';
 
   return (
     <div
@@ -106,9 +105,9 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
           <div className="flex flex-col overflow-hidden mr-2">
             <div className="flex items-center space-x-2 mb-1">
                <span className={clsx("text-[10px] px-1.5 py-0.5 rounded border uppercase font-bold tracking-wider", getBadgeColor(action))}>
-                {action}
+                {action || 'unknown'}
               </span>
-              <span className="text-xs text-gray-400 font-mono">{details.type}</span>
+              <span className="text-xs text-gray-400 font-mono">{details?.type || 'unknown_type'}</span>
             </div>
             <h3 className="font-semibold text-gray-800 dark:text-gray-100 truncate text-sm" title={address}>
               {address}
@@ -152,17 +151,29 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
           <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-4">
             {activeTab === 'analysis' ? (
               <div className="space-y-6 pb-4">
+                 {!hasDetails && (
+                    <div className="flex items-center p-4 text-sm text-yellow-800 border border-yellow-300 rounded-lg bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300 dark:border-yellow-800" role="alert">
+                      <AlertCircle className="flex-shrink-0 inline w-4 h-4 me-3" />
+                      <span className="sr-only">Info</span>
+                      <div>
+                        <span className="font-medium">Details unavailable.</span> The plan file might be missing detailed attributes for this resource. Check Raw JSON.
+                      </div>
+                    </div>
+                 )}
+
                  {/* Provider Info */}
+                 {hasDetails && (
                  <div className="grid grid-cols-2 gap-3">
                    <div className="bg-gray-50 dark:bg-gray-700/30 p-2.5 rounded border border-gray-100 dark:border-gray-700">
                       <span className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Resource Name</span>
-                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5 truncate" title={details.name}>{details.name}</div>
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5 truncate" title={details.name}>{details.name || '-'}</div>
                    </div>
                    <div className="bg-gray-50 dark:bg-gray-700/30 p-2.5 rounded border border-gray-100 dark:border-gray-700">
                       <span className="text-[10px] text-gray-400 uppercase font-semibold tracking-wide">Provider</span>
-                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5 truncate" title={details.provider_name}>{details.provider_name?.split('/').pop()}</div>
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-0.5 truncate" title={details.provider_name}>{details.provider_name ? details.provider_name.split('/').pop() : '-'}</div>
                    </div>
                  </div>
+                 )}
 
                  {/* Commands */}
                  <div>
@@ -192,7 +203,7 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
                 </div>
 
                  {/* Tags */}
-                 {after?.tags && Object.keys(after.tags).length > 0 && (
+                 {hasDetails && after?.tags && Object.keys(after.tags).length > 0 && (
                    <div>
                       <h4 className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500 mb-2 flex items-center">
                         <Tag className="w-3 h-3 mr-1.5" /> Tags
@@ -208,7 +219,7 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
                  )}
 
                  {/* Changes Diff */}
-                 {displayKeys.length > 0 && (
+                 {hasDetails && displayKeys.length > 0 && (
                    <div>
                       <h4 className="text-[10px] uppercase tracking-wider font-bold text-gray-400 dark:text-gray-500 mb-2 flex items-center">
                         <Layers className="w-3 h-3 mr-1.5" /> Attributes
@@ -218,7 +229,6 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
                            const valBefore = before ? before[key] : undefined;
                            const valAfter = after ? after[key] : undefined;
 
-                           // Skip undefined/null unless it's a change
                            if (valAfter === undefined && valBefore === undefined) return null;
 
                            const hasChanged = valBefore !== valAfter && valBefore !== undefined;
@@ -259,14 +269,14 @@ export default function ResourceDetails({ node, onClose }: ResourceDetailsProps)
             ) : (
               <div className="relative h-full group/json">
                 <button
-                  onClick={() => copyToClipboard(JSON.stringify(details, null, 2))}
+                  onClick={() => copyToClipboard(JSON.stringify(details || node.data, null, 2))}
                   className="absolute right-2 top-2 p-1.5 bg-gray-700 rounded hover:bg-gray-600 text-gray-300 opacity-0 group-hover/json:opacity-100 transition-opacity z-10"
                   title="Copy JSON"
                 >
                   <Copy className="w-3 h-3" />
                 </button>
                 <pre className="text-xs bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto font-mono border border-gray-700 min-h-full custom-scrollbar">
-                  {JSON.stringify(details, null, 2)}
+                  {JSON.stringify(details || node.data, null, 2)}
                 </pre>
               </div>
             )}
