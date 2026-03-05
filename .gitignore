@@ -39,3 +39,31 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# Local Terraform cache
+**/.terraform/
+**/.terraformrc
+
+# State files (sensitive)
+*.tfstate
+*.tfstate.*
+.terraform.tfstate*
+
+# Variable files (often sensitive)
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*_override.tf
+*_override.tf.json
+
+# Plan files
+*.tfplan*
+
+# Other local files
+.envrc
+crash.log
+override.tf
+override.tf.json
+
+lab.json
